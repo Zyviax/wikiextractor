@@ -60,7 +60,8 @@ import sys
 import argparse
 import bz2
 import codecs
-import cgi
+# import cgi
+import html
 import fileinput
 import logging
 import os.path
@@ -789,7 +790,7 @@ class Extractor(object):
             text = text.replace('|-', '')
             text = text.replace('|', '')
         if options.toHTML:
-            text = cgi.escape(text)
+            text = html.escape(text)
         return text
 
 
@@ -2837,10 +2838,23 @@ def process_dump(input_file, template_file, out_file, file_size, file_compress,
     :param process_count: number of extraction processes to spawn.
     """
 
+    def hook_compressed_encoded(encoding):
+        def hook(filename, mode):
+            ext = os.path.splitext(filename)[1]
+            if ext == '.gz':
+                import gzip
+                return gzip.open(filename, mode, encoding=encoding)
+            elif ext == '.bz2':
+                import bz2
+                return bz2.open(filename, mode, encoding=encoding)
+            else:
+                return open(filename, mode, encoding=encoding)
+        return hook
+
     if input_file == '-':
         input = sys.stdin
     else:
-        input = fileinput.FileInput(input_file, openhook=fileinput.hook_compressed)
+        input = fileinput.FileInput(input_file, openhook=hook_compressed_encoded('utf-8'))
 
     # collect siteinfo
     for line in input:
@@ -2879,7 +2893,7 @@ def process_dump(input_file, template_file, out_file, file_size, file_compress,
                 logging.info("Loading template definitions from: %s", template_file)
                 # can't use with here:
                 file = fileinput.FileInput(template_file,
-                                           openhook=fileinput.hook_compressed)
+                                           openhook=fileinput.hook_compressed_encoded('utf-8'))
                 load_templates(file)
                 file.close()
             else:
